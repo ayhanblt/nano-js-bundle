@@ -66,7 +66,7 @@ export class AIService {
           this.provider.sendMessageWithTools(
             message, 
             { systemPrompt, pageContext },
-            { toolCalls: response.toolCalls, toolResponses }
+            { toolCalls: response.toolCalls, toolResponses, modelParts: response.modelParts }
           ),
           15000 // slightly longer for continuation
         );

@@ -13,7 +13,7 @@ export class GeminiProvider implements AIProvider {
   async sendMessageWithTools(
     message: string, 
     _context: { systemPrompt: string; pageContext: string },
-    history?: { toolCalls: ToolCall[]; toolResponses: ToolResponse[] }
+    history?: { toolCalls: ToolCall[]; toolResponses: ToolResponse[]; modelParts?: any[] }
   ): Promise<AIResponse> {
     logger.log('GeminiProvider preparing request to backend...', { message, _endpointUrl: this._endpointUrl });
     

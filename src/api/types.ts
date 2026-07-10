@@ -13,6 +13,7 @@ export interface ToolResponse {
 export interface AIResponse {
   message: string;
   toolCalls?: ToolCall[];
+  modelParts?: any[];
   confidence?: number;
   sourceSections?: string[];
   error?: string;
@@ -36,6 +37,7 @@ export interface AIProvider {
     history?: {
       toolCalls: ToolCall[];
       toolResponses: ToolResponse[];
+      modelParts?: any[];
     }
   ): Promise<AIResponse>;
 }

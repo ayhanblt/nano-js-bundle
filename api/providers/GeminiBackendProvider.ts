@@ -15,7 +15,7 @@ export class GeminiBackendProvider {
   async sendMessage(
     message: string,
     context: { systemPrompt: string; pageContext: string },
-    history?: { toolCalls: any[]; toolResponses: any[] }
+    history?: { toolCalls: any[]; toolResponses: any[]; modelParts?: any[] }
   ) {
     try {
       const toolDeclarations: FunctionDeclaration[] = [
@@ -63,9 +63,10 @@ export class GeminiBackendProvider {
 
       // 2. Append history if we are in a tool round-trip
       if (history && history.toolCalls && history.toolResponses) {
+        // Use the preserved modelParts if available to satisfy thought_signature requirements
         contents.push({
           role: 'model',
-          parts: history.toolCalls.map(call => ({
+          parts: history.modelParts || history.toolCalls.map(call => ({
             functionCall: { name: call.name, args: call.args }
           }))
         });
@@ -91,7 +92,8 @@ export class GeminiBackendProvider {
       if (response.functionCalls && response.functionCalls.length > 0) {
         return {
           message: '', // No final text yet
-          toolCalls: response.functionCalls.map((fc: any) => ({ name: fc.name, args: fc.args }))
+          toolCalls: response.functionCalls.map((fc: any) => ({ name: fc.name, args: fc.args })),
+          modelParts: response.candidates?.[0]?.content?.parts || [] // PRESERVE ENTIRE PARTS (includes thought_signature)
         };
       }
 
