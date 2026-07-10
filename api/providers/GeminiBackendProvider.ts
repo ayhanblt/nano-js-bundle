@@ -17,14 +17,6 @@ export class GeminiBackendProvider {
     context: { systemPrompt: string; pageContext: string },
     history?: { toolCalls: any[]; toolResponses: any[] }
   ) {
-    // Temporary debug code to list available models
-    try {
-      const modelsResponse = await this.ai.models.list();
-      console.log('[DEBUG] Available models:', JSON.stringify(modelsResponse, null, 2));
-    } catch (err) {
-      console.error('[DEBUG] Failed to list models:', err);
-    }
-
     try {
       const toolDeclarations: FunctionDeclaration[] = [
         {
@@ -87,7 +79,7 @@ export class GeminiBackendProvider {
       }
 
       const response = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
+        model: process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
         contents,
         config: {
           tools: [{ functionDeclarations: toolDeclarations }],
@@ -108,7 +100,7 @@ export class GeminiBackendProvider {
         confidence: 0.9 // Placeholder
       };
     } catch (error: any) {
-      console.error('[GeminiBackendProvider] Error calling Gemini API:', error);
+      console.error(error);
       throw new Error('Failed to generate content from Gemini.');
     }
   }
