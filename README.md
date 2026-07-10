@@ -27,12 +27,33 @@ Built using Vite + React + TypeScript.
 The build is configured in "Library IIFE" mode with `vite-plugin-css-injected-by-js`.
 When you run `npm run build`, the entire application (including React, Tailwind, and local Fonts) is bundled into a single file: `dist/bundle.iife.js`.
 
+
 ### Console Snippet Usage
 To test the widget on any website, simply run the build and copy the contents of `dist/bundle.iife.js` into your browser's Developer Tools Console.
 - **Idempotent:** Running the script a second time will gracefully warn you and return the existing instance.
 - **Cleanup:** Run `window.__NANO_AI_WIDGET__.destroy()` to completely unmount React, remove the Shadow DOM, and clean up all injected highlight classes.
 
-## 5. Future Improvements
+## 4. Using in a web application
+
+Open any website in your browser and paste this code into the DevTools Console:
+
+```javascript
+(() => {
+  const s = document.createElement("script");
+  s.src = "https://your-copy-of-nano-ai-widget.vercel.app/bundle.iife.js";
+  document.head.appendChild(s);
+})();
+```
+
+## 5. Vercel Environment Variables
+```javascript
+
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-3.1-flash-lite
+VITE_API_BASE_URL=https://your-copy-of-nano-ai-widget.vercel.app/api/chat
+```
+
+## 6. Future Improvements
 - **Real Backend Integration:** Move the `GeminiProvider` mock logic into an Edge Function (e.g., Firebase Functions, Cloudflare Workers) to securely hold the API keys.
 - **Advanced Relevance Scoring:** Implement vector embeddings for `scoreRelevance` to find semantic matches in the DOM instead of exact keyword matches.
 - **Mutation Observer:** If the host page is a SPA (Single Page Application), the widget could listen for DOM mutations to re-scan the context dynamically.

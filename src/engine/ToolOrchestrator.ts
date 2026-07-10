@@ -53,6 +53,10 @@ export class ToolOrchestrator {
       let result: any = null;
 
       switch (call.name) {
+        case 'listVisibleProducts':
+          result = this.analyzer.listVisibleProducts();
+          return { status: result.productsFound > 0 ? 'success' : 'empty', tool: call.name, result };
+
         case 'listVisibleSections':
           result = this.analyzer.listVisibleSections();
           return { status: result.length > 0 ? 'success' : 'empty', tool: call.name, result };
@@ -65,17 +69,22 @@ export class ToolOrchestrator {
           result = this.analyzer.scoreRelevance(call.args.query, call.args.sectionIds);
           return { status: result.length > 0 ? 'success' : 'empty', tool: call.name, result };
 
-        case 'highlightElements':
-          const el = this.analyzer.getElementBySectionId(call.args.sectionId);
-          if (el) {
+        case 'highlightElements': {
+          const ids: string[] = call.args.sectionIds || (call.args.sectionId ? [call.args.sectionId] : []);
+          const elements = ids.map((id: string) => this.analyzer.getElementBySectionId(id)).filter(Boolean) as Element[];
+          
+          if (elements.length > 0) {
             this.highlighter.clearHighlights();
-            this.highlighter.highlightElements([el]);
-            this.highlighter.scrollToElement([el]);
-            result = { highlighted: true, sectionId: call.args.sectionId };
+            const highlighted = this.highlighter.highlightElements(elements) ? elements.length : 0;
+            this.highlighter.scrollToElement(elements);
+            
+            result = { matched: elements.length, highlighted, elementIds: ids };
             return { status: 'success', tool: call.name, result };
           } else {
-            return { status: 'error', tool: call.name, result: null, error: 'Element not found' };
+            result = { matched: 0, highlighted: 0 };
+            return { status: 'empty', tool: call.name, result };
           }
+        }
 
         default:
           return { status: 'error', tool: call.name, result: null, error: `Unknown tool: ${call.name}` };

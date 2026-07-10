@@ -11,6 +11,25 @@
       scrollbar-width: none;
   }
 
+  .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.5); /* gray-400 with opacity */
+      border-radius: 9999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(107, 114, 128, 0.8); /* gray-500 with higher opacity */
+  }
+  .custom-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+
   .shimmer {
       background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
       background-size: 200% 100%;

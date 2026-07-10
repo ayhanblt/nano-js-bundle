@@ -65,6 +65,116 @@ export class DOMAnalyzer {
   }
 
   /**
+   * Identifies product cards on the screen using heuristic scoring.
+   * Does not rely on specific class names or IDs.
+   */
+  public listVisibleProducts() {
+    const products: Array<any> = [];
+    const processedNodes = new Set<HTMLElement>();
+    
+    // Signal: Products typically contain images
+    const images = document.querySelectorAll('img, picture');
+    
+    images.forEach(img => {
+      let current: HTMLElement | null = img as HTMLElement;
+      let depth = 0;
+      let bestCandidate: HTMLElement | null = null;
+      let bestConfidence = 0;
+      
+      // Traverse up to 6 levels to find a suitable card container
+      while (current && current !== document.body && depth < 6) {
+        if (processedNodes.has(current)) {
+           break;
+        }
+
+        let confidence = 0;
+        const text = current.innerText || '';
+        
+        // Signal 1: Contains price (currency symbol + number)
+        const priceMatch = text.match(/(?:₺|\$|€|£|TL)\s*\d+[.,]?\d*|\d+[.,]?\d*\s*(?:TL|USD|EUR|TRY)/i);
+        if (priceMatch) confidence += 0.4;
+        
+        // Signal 2: Contains link
+        if (current.tagName === 'A' || current.querySelector('a')) confidence += 0.2;
+        
+        // Signal 3: Contains Heading or Strong text for title
+        if (current.querySelector('h1, h2, h3, h4, h5, h6, strong, b')) confidence += 0.2;
+        
+        // Signal 4: Semantic classes
+        const className = (current.className || '').toString().toLowerCase();
+        if (className.includes('product') || className.includes('item') || className.includes('card')) {
+          confidence += 0.1;
+        }
+        
+        // Signal 5: Dimensions (visible and reasonable size for a card)
+        const rect = current.getBoundingClientRect();
+        if (rect.width > 50 && rect.height > 50 && rect.width < 1000 && rect.height < 1000) {
+          confidence += 0.1;
+        }
+
+        if (confidence > bestConfidence) {
+          bestConfidence = confidence;
+          bestCandidate = current;
+        }
+        
+        current = current.parentElement;
+        depth++;
+      }
+      
+      // If we found a good candidate
+      if (bestCandidate && bestConfidence >= 0.6) {
+        processedNodes.add(bestCandidate);
+        
+        // Mark all descendants as processed to avoid nested card detection
+        const allDescendants = bestCandidate.querySelectorAll('*');
+        allDescendants.forEach(d => processedNodes.add(d as HTMLElement));
+
+        // Assign Section ID for highlight integration
+        let sectionId = bestCandidate.getAttribute(DOMAnalyzer.NANO_ID_ATTR);
+        if (!sectionId) {
+          sectionId = `nano-prod-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          bestCandidate.setAttribute(DOMAnalyzer.NANO_ID_ATTR, sectionId);
+          
+          // Register it in sectionMap so highlightElements can use it
+          this.sectionMap.set(sectionId, {
+             sectionId,
+             title: 'Product Card',
+             summary: 'Heuristically detected product card',
+             element: bestCandidate
+          });
+        }
+
+        // Extract Product Data
+        const text = bestCandidate.innerText || '';
+        const priceMatch = text.match(/(?:₺|\$|€|£|TL)\s*\d+[.,]?\d*|\d+[.,]?\d*\s*(?:TL|USD|EUR|TRY)/i);
+        const headings = bestCandidate.querySelectorAll('h1, h2, h3, h4, h5, h6, strong');
+        const title = headings.length > 0 ? (headings[0] as HTMLElement).innerText : text.split('\n')[0].substring(0, 50);
+        
+        const link = bestCandidate.tagName === 'A' ? bestCandidate : bestCandidate.querySelector('a');
+        const url = link ? (link as HTMLAnchorElement).href : null;
+
+        products.push({
+          title: title.trim(),
+          price: priceMatch ? priceMatch[0].trim() : null,
+          url,
+          sectionId,
+          confidence: Number(bestConfidence.toFixed(2))
+        });
+      }
+    });
+
+    const averageConfidence = products.length > 0 
+      ? Number((products.reduce((acc, p) => acc + p.confidence, 0) / products.length).toFixed(2)) 
+      : 0;
+
+    return {
+      productsFound: products.length,
+      averageConfidence,
+      products
+    };
+  }
+
+  /**
    * Reads the readable text of a specific section.
    */
   public readSection(sectionId: string): string | null {

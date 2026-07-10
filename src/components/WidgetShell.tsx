@@ -9,7 +9,7 @@ import Icon from './Icon';
 
 const WidgetShell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { messages, isThinking, error, setError, sendMessage } = useChat();
+    const { messages, isThinking, error, suggestions, setError, sendMessage } = useChat();
 
   const handleSuggestionClick = (suggestion: string) => {
     sendMessage(suggestion);
@@ -18,11 +18,11 @@ const WidgetShell: React.FC = () => {
   const handleClose = () => setIsOpen(false);
 
   return (
-    <div className="fixed bottom-0 right-0 md:bottom-lg md:right-lg z-50 flex flex-col items-end gap-md pointer-events-none w-full md:max-w-[420px]">
+    <div className="fixed bottom-0 right-0 md:bottom-lg md:right-lg z-50 flex flex-col items-end gap-md pointer-events-none w-full md:max-w-[380px]">
       
       {/* Widget Window */}
       <div 
-        className={`pointer-events-auto transition-all duration-300 transform w-full md:max-w-[420px] h-[85vh] md:h-[640px] flex flex-col bg-surface-container-lowest md:shadow-2xl rounded-t-2xl md:rounded-xl border-t md:border border-outline-variant overflow-hidden ${isOpen ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-0 md:translate-y-0 md:scale-0 pointer-events-none'}`}
+        className={`pointer-events-auto transition-all duration-300 transform w-full md:max-w-[380px] h-[85vh] md:h-[580px] flex flex-col bg-surface-container-lowest md:shadow-2xl rounded-t-2xl md:rounded-xl border-t md:border border-outline-variant overflow-hidden ${isOpen ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-0 md:translate-y-0 md:scale-0 pointer-events-none'}`}
         style={{ transformOrigin: 'bottom right' }}
       >
         {error ? (
@@ -35,7 +35,7 @@ const WidgetShell: React.FC = () => {
             <WidgetHeader onClose={handleClose} />
             
             {messages.length === 0 ? (
-              <EmptyState onSuggestionClick={handleSuggestionClick} />
+              <EmptyState onSuggestionClick={handleSuggestionClick} suggestions={suggestions} />
             ) : (
               <ActiveChatState messages={messages} isThinking={isThinking} />
             )}
@@ -43,11 +43,7 @@ const WidgetShell: React.FC = () => {
             <WidgetInput 
               onSendMessage={sendMessage} 
               disabled={isThinking} 
-              suggestions={messages.length > 0 ? [
-                "Compare with Pro Y", 
-                "Check availability", 
-                "Shipping info"
-              ] : []}
+              suggestions={messages.length > 0 ? suggestions : []}
             />
           </>
         )}

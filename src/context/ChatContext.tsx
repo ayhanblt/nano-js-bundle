@@ -5,10 +5,13 @@ import { GeminiProvider } from '../api/GeminiProvider';
 import { AIService } from '../api/AIService';
 import { ToolOrchestrator } from '../engine/ToolOrchestrator';
 
+import { SuggestionEngine } from '../engine/SuggestionEngine';
+
 interface ChatContextProps {
   messages: Message[];
   isThinking: boolean;
   error: string | null;
+  suggestions: string[];
   sendMessage: (text: string) => Promise<void>;
   addMessage: (msg: Message) => void;
   clearMessages: () => void;
@@ -21,12 +24,25 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [messages, setMessages] = useState<Message[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   
-  const aiService = useMemo(() => {
+  const { aiService, suggestionEngine } = useMemo(() => {
     const orchestrator = new ToolOrchestrator();
     const provider = new GeminiProvider();
-    return new AIService(provider, orchestrator);
+    const aiService = new AIService(provider, orchestrator);
+    const suggestionEngine = new SuggestionEngine(orchestrator.analyzer);
+    return { aiService, suggestionEngine };
   }, []);
+
+  // Update suggestions whenever messages change
+  useEffect(() => {
+    // Generate new suggestions non-blocking
+    const timer = setTimeout(() => {
+      const newSuggestions = suggestionEngine.generateSuggestions(messages);
+      setSuggestions(newSuggestions);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [messages, suggestionEngine]);
 
   useEffect(() => {
     aiService.initialize();
@@ -79,7 +95,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <ChatContext.Provider value={{ messages, isThinking, error, sendMessage, addMessage, clearMessages, setError }}>
+    <ChatContext.Provider value={{ messages, isThinking, error, suggestions, sendMessage, addMessage, clearMessages, setError }}>
       {children}
     </ChatContext.Provider>
   );

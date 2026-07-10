@@ -34,7 +34,7 @@ export interface AIProvider {
       systemPrompt: string;
       pageContext: string;
     },
-    history?: {
+    history?: any[] | {
       toolCalls: ToolCall[];
       toolResponses: ToolResponse[];
       modelParts?: any[];

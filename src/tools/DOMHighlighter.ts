@@ -26,20 +26,23 @@ export class DOMHighlighter {
     // while highlighted, but removing the class will restore original state perfectly.
     style.textContent = `
       .${DOMHighlighter.HIGHLIGHT_CLASS} {
-        animation: nano-pulse-glow 2s infinite ease-in-out !important;
+        animation: nano-pulse-glow-yellow 2s infinite ease-in-out !important;
         position: relative !important;
-        z-index: 9999 !important;
-        border-radius: 8px !important;
+        z-index: 2147483647 !important;
+        border-radius: 4px !important;
+        outline: 2px solid #FFD700 !important;
+        outline-offset: 4px !important;
+        transition: all 0.3s ease-in-out !important;
       }
 
-      @keyframes nano-pulse-glow {
+      @keyframes nano-pulse-glow-yellow {
         0%, 100% { 
-          box-shadow: 0 0 0 0px rgba(99, 14, 212, 0) !important; 
-          background-color: transparent !important; 
+          box-shadow: 0 0 0 0px rgba(255, 215, 0, 0) !important; 
+          background-color: rgba(255, 215, 0, 0.05) !important; 
         }
         50% { 
-          box-shadow: 0 0 15px 5px rgba(99, 14, 212, 0.3) !important; 
-          background-color: rgba(99, 14, 212, 0.05) !important; 
+          box-shadow: 0 0 15px 5px rgba(255, 215, 0, 0.4) !important; 
+          background-color: rgba(255, 215, 0, 0.2) !important; 
         }
       }
     `;

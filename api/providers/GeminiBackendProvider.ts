@@ -20,6 +20,11 @@ export class GeminiBackendProvider {
     try {
       const toolDeclarations: FunctionDeclaration[] = [
         {
+          name: 'listVisibleProducts',
+          description: 'Detects and lists all product cards visible on the screen, returning heuristic confidence, title, price, and ID.',
+          parameters: { type: Type.OBJECT, properties: {} }
+        },
+        {
           name: 'listVisibleSections',
           description: 'Lists all visible sections with their IDs, titles, and summaries from the page.',
           parameters: { type: Type.OBJECT, properties: {} }
@@ -44,11 +49,17 @@ export class GeminiBackendProvider {
         },
         {
           name: 'highlightElements',
-          description: 'Highlights a specific section on the screen. Call this ONLY when you want to show the user exactly where the information is on the page. Use sectionId from other tools.',
+          description: 'Highlights one or more sections on the screen. Call this ONLY when you want to show the user exactly where the information is. Use sectionIds to highlight multiple items.',
           parameters: {
             type: Type.OBJECT,
-            properties: { sectionId: { type: Type.STRING, description: 'The ID of the section to highlight' } },
-            required: ['sectionId']
+            properties: { 
+              sectionIds: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING },
+                description: 'Array of section IDs to highlight' 
+              },
+              sectionId: { type: Type.STRING, description: 'Legacy single section ID' }
+            }
           }
         }
       ];
@@ -61,19 +72,22 @@ export class GeminiBackendProvider {
         parts: [{ text: `System Context: ${context.systemPrompt}\n\nPage Content: ${context.pageContext}\n\nUser Message: ${message}` }]
       });
 
-      // 2. Append history if we are in a tool round-trip
-      if (history && history.toolCalls && history.toolResponses) {
-        // Use the preserved modelParts if available to satisfy thought_signature requirements
+      // 2. Append conversation history (from previous tool loops)
+      if (history && Array.isArray(history) && history.length > 0) {
+        contents.push(...history);
+      } else if (history && (history as any).toolCalls && (history as any).toolResponses) {
+        // Legacy fallback just in case
+        const legacyHistory = history as any;
         contents.push({
           role: 'model',
-          parts: history.modelParts || history.toolCalls.map(call => ({
+          parts: legacyHistory.modelParts || legacyHistory.toolCalls.map((call: any) => ({
             functionCall: { name: call.name, args: call.args }
           }))
         });
 
         contents.push({
           role: 'user',
-          parts: history.toolResponses.map(res => ({
+          parts: legacyHistory.toolResponses.map((res: any) => ({
             functionResponse: { name: res.tool, response: { status: res.status, result: res.result, error: res.error } }
           }))
         });

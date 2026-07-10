@@ -3,10 +3,12 @@ import Icon from './Icon';
 
 interface EmptyStateProps {
   onSuggestionClick: (suggestion: string) => void;
+  suggestions?: string[];
 }
 
-const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestionClick }) => {
+const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestionClick, suggestions = [] }) => {
   const [offsetY, setOffsetY] = useState(0);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Floating animation
   useEffect(() => {
@@ -23,11 +25,13 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestionClick }) => {
     return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
-  const suggestions = [
-    "Does this support Wi-Fi 6?",
-    "What's the warranty?",
-    "Is it energy efficient?"
-  ];
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (scrollContainerRef.current) {
+      if (e.deltaY !== 0 && e.shiftKey) {
+        // Native horizontal scroll
+      }
+    }
+  };
 
   return (
     <div className="flex-1 p-lg flex flex-col items-center justify-center text-center bg-[#fdfaff] overflow-y-auto">
@@ -37,22 +41,28 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestionClick }) => {
       >
         <Icon name="forum" className="w-20 h-20 fill-primary" />
       </div>
-      <h3 className="text-headline-md font-headline-md text-on-surface mb-sm">Ask anything about this product</h3>
-      <p className="text-body-md text-on-surface-variant px-md leading-relaxed">
-        The assistant understands the current page and can point you directly to the relevant information.
+      <h3 className="text-headline-md font-headline-md text-on-surface mb-sm">Bana herhangi bir şey sor</h3>
+      <p className="text-body-md text-on-surface-variant px-md leading-relaxed mb-xl">
+        Bu sayfadaki ürünleri anlıyor ve size yardımcı olabiliyorum.
       </p>
       
-      <div className="mt-xl w-full flex flex-wrap justify-center gap-sm">
-        {suggestions.map((sug, idx) => (
-          <button 
-            key={idx}
-            onClick={() => onSuggestionClick(sug)}
-            className="bg-white border border-outline-variant hover:border-primary-container hover:text-primary px-md py-sm rounded-full text-label-sm font-label-sm transition-all shadow-sm cursor-pointer"
-          >
-            {sug}
-          </button>
-        ))}
-      </div>
+      {suggestions.length > 0 && (
+        <div 
+          ref={scrollContainerRef}
+          onWheel={handleWheel}
+          className="w-full flex gap-sm overflow-x-auto scrollbar-hide snap-x snap-mandatory px-md -mx-md pb-xs"
+        >
+          {suggestions.map((sug, idx) => (
+            <button 
+              key={idx}
+              onClick={() => onSuggestionClick(sug)}
+              className="snap-start flex-none w-[calc(85%)] sm:w-[calc(65%)] md:w-[calc(50%-4px)] p-md bg-white border border-outline-variant hover:border-primary hover:text-primary rounded-xl text-left transition-colors shadow-sm cursor-pointer active:scale-95"
+            >
+              <span className="line-clamp-2 text-label-md font-label-md leading-snug">{sug}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -10,15 +10,31 @@ interface ActiveChatStateProps {
 
 const ActiveChatState: React.FC<ActiveChatStateProps> = ({ messages, isThinking }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const isScrolledUp = useRef(false);
+
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    // User is considered scrolled up if they are more than 50px away from the bottom
+    isScrolledUp.current = scrollHeight - scrollTop - clientHeight > 50;
+  };
 
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    if (containerRef.current && !isScrolledUp.current) {
+      // Smooth scroll behavior might interfere with rapid message updates, so we use auto or smooth based on preference
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   }, [messages, isThinking]);
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto p-md scrollbar-hide flex flex-col gap-lg bg-surface">
+    <div 
+      ref={containerRef} 
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto p-md custom-scrollbar flex flex-col gap-lg bg-surface"
+    >
       {messages.map((msg) => (
         <MessageBubble key={msg.id} message={msg} />
       ))}

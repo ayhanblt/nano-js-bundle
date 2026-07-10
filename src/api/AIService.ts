@@ -39,8 +39,9 @@ export class AIService {
       );
 
       let loopCount = 0;
-      const MAX_TOOLS = 5;
+      const MAX_TOOLS = 3; // Reduced max tools for optimization
       let finalAction: MessageAction | undefined = undefined;
+      const conversationHistory: any[] = [];
       
       // Loop for multi-step tool execution (Round-Trip)
       while (response.toolCalls && response.toolCalls.length > 0 && loopCount < MAX_TOOLS) {
@@ -61,12 +62,27 @@ export class AIService {
           return res;
         });
 
-        // Send tool results back to provider to continue conversation
+        // Add this round to conversation history
+        conversationHistory.push({
+          role: 'model',
+          parts: response.modelParts || response.toolCalls.map(call => ({
+            functionCall: { name: call.name, args: call.args }
+          }))
+        });
+
+        conversationHistory.push({
+          role: 'user',
+          parts: toolResponses.map(res => ({
+            functionResponse: { name: res.tool, response: { status: res.status, result: res.result, error: res.error } }
+          }))
+        });
+
+        // Send tool results back to provider to continue conversation using cumulative history
         response = await this.withTimeout(
           this.provider.sendMessageWithTools(
             message, 
             { systemPrompt, pageContext },
-            { toolCalls: response.toolCalls, toolResponses, modelParts: response.modelParts }
+            conversationHistory
           ),
           15000 // slightly longer for continuation
         );
