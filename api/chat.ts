@@ -1,4 +1,4 @@
-import { GeminiBackendProvider } from './providers/GeminiBackendProvider';
+import { GeminiBackendProvider } from './providers/GeminiBackendProvider.js';
 
 export default async function handler(req: any, res: any) {
   // Only allow POST requests
@@ -13,7 +13,11 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Message is required.' });
     }
 
-    const provider = new GeminiBackendProvider();
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Server configuration error: GEMINI_API_KEY is missing.' });
+    }
+    const provider = new GeminiBackendProvider(apiKey);
     
     // Call the provider which encapsulates the Gemini SDK
     const response = await provider.sendMessage(
