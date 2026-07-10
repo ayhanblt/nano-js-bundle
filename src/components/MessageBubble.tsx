@@ -1,5 +1,6 @@
 import React from 'react';
 import Icon from './Icon';
+import { t } from '../i18n';
 
 export interface MessageAction {
   label: string;
@@ -52,11 +53,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               {message.confidence && (
                 <div className="flex items-center gap-xs">
                   <Icon name="query_stats" className="w-3.5 h-3.5 fill-current" />
-                  <span>Confidence {message.confidence}%</span>
+                  <span>{t('lbl.confidence')} {message.confidence}%</span>
                 </div>
               )}
               {message.source && (
-                <span className="italic text-primary/80">Found in {message.source}</span>
+                <span className="italic text-primary/80">{t('lbl.found.in')} {message.source}</span>
               )}
             </div>
           )}

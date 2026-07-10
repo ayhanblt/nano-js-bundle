@@ -37,6 +37,7 @@ import BookmarkIcon from '../assets/icons/bookmark.svg?react';
 import SettingsIcon from '../assets/icons/settings.svg?react';
 import PersonIcon from '../assets/icons/person.svg?react';
 import AddCircleIcon from '../assets/icons/add_circle.svg?react';
+import MainLogoIcon from '../assets/icons/main-logo.svg?react';
 
 const iconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   search: SearchIcon,
@@ -75,6 +76,7 @@ const iconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   settings: SettingsIcon,
   person: PersonIcon,
   add_circle: AddCircleIcon,
+  main_logo: MainLogoIcon
 };
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {

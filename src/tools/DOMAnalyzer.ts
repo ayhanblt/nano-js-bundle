@@ -1,222 +1,346 @@
-export interface SectionData {
-  sectionId: string;
-  title: string;
-  summary: string;
-  element: HTMLElement;
-}
+import type { Registry, Product, Section, PageContext, DOMReference } from './types';
 
 export class DOMAnalyzer {
-  private sectionMap: Map<string, SectionData> = new Map();
+  private registry: Registry = {
+    version: 0,
+    createdAt: Date.now(),
+    isValid: false,
+    analysisDuration: 0,
+    sections: [],
+    products: [],
+    pageContext: this.createEmptyContext()
+  };
+  
+  private observer: MutationObserver | null = null;
+  private analyzeTimeout: any = null;
+  private isReady = false;
   private static readonly NANO_ID_ATTR = 'data-nano-section-id';
 
-  /**
-   * Scans the host page DOM for meaningful sections (headings, articles, sections, main wrappers).
-   * Generates IDs for elements and tracks them.
-   */
-  public listVisibleSections(): Pick<SectionData, 'sectionId' | 'title' | 'summary'>[] {
-    this.sectionMap.clear();
+  // --- Core Lifecycle ---
 
-    const sections: Pick<SectionData, 'sectionId' | 'title' | 'summary'>[] = [];
-    
-    // Simplistic selector for demo purposes. 
-    // Real implementation would look for actual structural elements like article, section, [role="main"], etc.
-    const candidates = document.querySelectorAll('section, article, div > h1, div > h2, div > h3');
-    
-    let counter = 0;
-    
-    candidates.forEach((el) => {
-      // Find the parent block if we hit a heading
-      const container = (el.tagName.match(/^H[1-6]$/) ? el.parentElement : el) as HTMLElement;
-      if (!container) return;
+  public async waitUntilReady(): Promise<boolean> {
+    if (this.isReady && this.registry.isValid) return true;
 
-      // Ensure it's somewhat visible and meaningful
-      if (container.offsetParent === null || container.innerText.trim().length < 20) return;
-
-      // Check if already processed
-      if (container.hasAttribute(DOMAnalyzer.NANO_ID_ATTR)) {
-         return; 
-      }
-
-      const sectionId = `nano-sec-${Date.now()}-${counter++}`;
-      container.setAttribute(DOMAnalyzer.NANO_ID_ATTR, sectionId);
-
-      // Extract title and summary
-      const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
-      const title = headings.length > 0 ? (headings[0] as HTMLElement).innerText : 'Untitled Section';
-      const summary = container.innerText.substring(0, 100).replace(/\n/g, ' ') + '...';
-
-      const sectionData: SectionData = {
-        sectionId,
-        title: title.trim(),
-        summary: summary.trim(),
-        element: container
+    return new Promise<boolean>((resolve) => {
+      const check = () => {
+        if (this.isReady && this.registry.isValid) {
+          resolve(true);
+        } else {
+          setTimeout(check, 100);
+        }
       };
-
-      this.sectionMap.set(sectionId, sectionData);
-
-      sections.push({
-        sectionId,
-        title: sectionData.title,
-        summary: sectionData.summary
-      });
+      
+      if (!this.observer) {
+        this.setupObserverLayer();
+      }
+      
+      if (document.readyState === 'complete') {
+        this.analyzeDOM();
+      } else {
+        window.addEventListener('load', () => this.analyzeDOM(), { once: true });
+      }
+      
+      check();
     });
-
-    return sections;
   }
 
-  /**
-   * Identifies product cards on the screen using heuristic scoring.
-   * Does not rely on specific class names or IDs.
-   */
-  public listVisibleProducts() {
-    const products: Array<any> = [];
-    const processedNodes = new Set<HTMLElement>();
-    
-    // Signal: Products typically contain images
-    const images = document.querySelectorAll('img, picture');
-    
-    images.forEach(img => {
-      let current: HTMLElement | null = img as HTMLElement;
-      let depth = 0;
-      let bestCandidate: HTMLElement | null = null;
-      let bestConfidence = 0;
-      
-      // Traverse up to 6 levels to find a suitable card container
-      while (current && current !== document.body && depth < 6) {
-        if (processedNodes.has(current)) {
-           break;
-        }
+  private setupObserverLayer() {
+    if (this.observer) return;
 
-        let confidence = 0;
-        const text = current.innerText || '';
-        
-        // Signal 1: Contains price (currency symbol + number)
-        const priceMatch = text.match(/(?:₺|\$|€|£|TL)\s*\d+[.,]?\d*|\d+[.,]?\d*\s*(?:TL|USD|EUR|TRY)/i);
-        if (priceMatch) confidence += 0.4;
-        
-        // Signal 2: Contains link
-        if (current.tagName === 'A' || current.querySelector('a')) confidence += 0.2;
-        
-        // Signal 3: Contains Heading or Strong text for title
-        if (current.querySelector('h1, h2, h3, h4, h5, h6, strong, b')) confidence += 0.2;
-        
-        // Signal 4: Semantic classes
-        const className = (current.className || '').toString().toLowerCase();
-        if (className.includes('product') || className.includes('item') || className.includes('card')) {
-          confidence += 0.1;
-        }
-        
-        // Signal 5: Dimensions (visible and reasonable size for a card)
-        const rect = current.getBoundingClientRect();
-        if (rect.width > 50 && rect.height > 50 && rect.width < 1000 && rect.height < 1000) {
-          confidence += 0.1;
-        }
-
-        if (confidence > bestConfidence) {
-          bestConfidence = confidence;
-          bestCandidate = current;
-        }
-        
-        current = current.parentElement;
-        depth++;
-      }
-      
-      // If we found a good candidate
-      if (bestCandidate && bestConfidence >= 0.6) {
-        processedNodes.add(bestCandidate);
-        
-        // Mark all descendants as processed to avoid nested card detection
-        const allDescendants = bestCandidate.querySelectorAll('*');
-        allDescendants.forEach(d => processedNodes.add(d as HTMLElement));
-
-        // Assign Section ID for highlight integration
-        let sectionId = bestCandidate.getAttribute(DOMAnalyzer.NANO_ID_ATTR);
-        if (!sectionId) {
-          sectionId = `nano-prod-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          bestCandidate.setAttribute(DOMAnalyzer.NANO_ID_ATTR, sectionId);
-          
-          // Register it in sectionMap so highlightElements can use it
-          this.sectionMap.set(sectionId, {
-             sectionId,
-             title: 'Product Card',
-             summary: 'Heuristically detected product card',
-             element: bestCandidate
-          });
-        }
-
-        // Extract Product Data
-        const text = bestCandidate.innerText || '';
-        const priceMatch = text.match(/(?:₺|\$|€|£|TL)\s*\d+[.,]?\d*|\d+[.,]?\d*\s*(?:TL|USD|EUR|TRY)/i);
-        const headings = bestCandidate.querySelectorAll('h1, h2, h3, h4, h5, h6, strong');
-        const title = headings.length > 0 ? (headings[0] as HTMLElement).innerText : text.split('\n')[0].substring(0, 50);
-        
-        const link = bestCandidate.tagName === 'A' ? bestCandidate : bestCandidate.querySelector('a');
-        const url = link ? (link as HTMLAnchorElement).href : null;
-
-        products.push({
-          title: title.trim(),
-          price: priceMatch ? priceMatch[0].trim() : null,
-          url,
-          sectionId,
-          confidence: Number(bestConfidence.toFixed(2))
-        });
-      }
+    this.observer = new MutationObserver(() => {
+      if (this.analyzeTimeout) clearTimeout(this.analyzeTimeout);
+      this.analyzeTimeout = setTimeout(() => {
+        this.analyzeDOM();
+      }, 250); // 250ms debounce
     });
 
-    const averageConfidence = products.length > 0 
-      ? Number((products.reduce((acc, p) => acc + p.confidence, 0) / products.length).toFixed(2)) 
-      : 0;
+    this.observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
 
+  private analyzeDOM() {
+    const startTime = performance.now();
+    try {
+      const { newSections, newProducts } = this.performSingleTraversal();
+      
+      const newContext: PageContext = {
+        platform: window.location.hostname,
+        language: document.documentElement.lang || 'tr',
+        currency: 'TRY',
+        title: document.title,
+        url: window.location.href,
+        sections: newSections,
+        products: newProducts,
+        contextMetadata: {}
+      };
+
+      const newRegistry: Registry = {
+        version: this.registry.version + 1,
+        createdAt: Date.now(),
+        isValid: false,
+        analysisDuration: performance.now() - startTime,
+        sections: newSections,
+        products: newProducts,
+        pageContext: newContext
+      };
+
+      const isValid = this.validateRegistry(newRegistry);
+      newRegistry.isValid = isValid;
+
+      if (isValid) {
+        this.registry = Object.freeze(newRegistry);
+        this.isReady = true;
+        if (import.meta.env.DEV) {
+          console.log(`[NANO DEBUG] 🔄 Unified Registry Updated (v${this.registry.version})`, this.registry);
+        }
+      } else {
+        if (import.meta.env.DEV) {
+          console.log(`[NANO DEBUG] ⚠️ Registry Validation Failed, keeping previous version (v${this.registry.version})`);
+        }
+      }
+    } catch (e) {
+      console.error('[NANO DEBUG] Error analyzing DOM:', e);
+    }
+  }
+
+  private validateRegistry(newReg: Registry): boolean {
+    if (!document.body) return false;
+    
+    // Prevent empty overwrite on the same URL if we previously had products
+    if (this.registry.isValid && 
+        this.registry.products.length > 0 && 
+        newReg.products.length === 0 && 
+        this.registry.pageContext.url === newReg.pageContext.url) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  // --- Extractors ---
+
+  private getSelector(el: HTMLElement): string {
+    if (el.id) return `#${el.id}`;
+    let path = [];
+    let current: HTMLElement | null = el;
+    while (current && current.tagName !== 'HTML') {
+      let selector = current.tagName.toLowerCase();
+      if (current.className && typeof current.className === 'string') {
+        const classes = current.className.split(' ').filter(c => c && !c.startsWith('nano-')).join('.');
+        if (classes) selector += `.${classes}`;
+      }
+      path.unshift(selector);
+      current = current.parentElement;
+    }
+    return path.join(' > ');
+  }
+
+  private assignDatasetId(el: HTMLElement, prefix: string): string {
+    let id = el.getAttribute(DOMAnalyzer.NANO_ID_ATTR);
+    if (!id) {
+      id = `nano-${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      el.setAttribute(DOMAnalyzer.NANO_ID_ATTR, id);
+    }
+    return id;
+  }
+
+  private performSingleTraversal() {
+    const sections: Section[] = [];
+    const products: Product[] = [];
+    
+    // Boundary-Driven candidate extraction
+    const candidates = document.querySelectorAll('article, section, div > h1, div > h2, div > h3, li, .product, .card, .item');
+    const processedNodes = new Set<HTMLElement>();
+
+    candidates.forEach((el) => {
+      try {
+        const current = el as HTMLElement;
+        if (processedNodes.has(current)) return;
+        if (current.offsetParent === null) return;
+        
+        const text = current.innerText || '';
+        if (text.length < 10) return;
+
+        // Is it a Product Boundary?
+        const priceMatch = text.match(/(?:₺|\$|€|£|TL)\s*\d+[.,]?\d*|\d+[.,]?\d*\s*(?:TL|USD|EUR|TRY)/i);
+        const images = current.querySelectorAll('img');
+        const links = current.querySelectorAll('a');
+        
+        if (priceMatch && images.length > 0 && links.length > 0 && current.getBoundingClientRect().width > 50) {
+           const id = this.assignDatasetId(current, 'prod');
+           const headings = current.querySelectorAll('h1, h2, h3, h4, h5, h6, strong, b');
+           let title = headings.length > 0 ? (headings[0] as HTMLElement).innerText : text.split('\n')[0];
+           title = title.substring(0, 50).trim();
+           
+           if (title.length > 3) {
+             products.push({
+               id,
+               type: 'PRODUCT',
+               domRef: { selector: this.getSelector(current), datasetId: id },
+               title,
+               text: text.trim(),
+               price: priceMatch[0].trim(),
+               currency: null,
+               url: (links[0] as HTMLAnchorElement).href,
+               image: (images[0] as HTMLImageElement).src || null,
+               confidence: 'HIGH'
+             });
+             current.querySelectorAll('*').forEach(d => processedNodes.add(d as HTMLElement));
+             return;
+           }
+        }
+        
+        // If not a product, is it a Section Boundary?
+        if (['SECTION', 'ARTICLE'].includes(current.tagName) || current.tagName.match(/^H[1-6]$/) || (current.parentElement && current.parentElement.tagName === 'SECTION')) {
+           const container = current.tagName.match(/^H[1-6]$/) ? current.parentElement! : current;
+           if (processedNodes.has(container)) return;
+           if (container.innerText.length < 20) return;
+           
+           const id = this.assignDatasetId(container, 'sec');
+           const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
+           const title = headings.length > 0 ? (headings[0] as HTMLElement).innerText : 'Untitled Section';
+           const summary = container.innerText.substring(0, 100).replace(/\n/g, ' ') + '...';
+           
+           sections.push({
+             id,
+             type: 'SECTION',
+             domRef: { selector: this.getSelector(container), datasetId: id },
+             title: title.trim(),
+             text: container.innerText,
+             summary: summary.trim()
+           });
+           
+           container.querySelectorAll('*').forEach(d => processedNodes.add(d as HTMLElement));
+        }
+      } catch (e) {}
+    });
+
+    return { newSections: sections, newProducts: products };
+  }
+
+  private createEmptyContext(): PageContext {
     return {
-      productsFound: products.length,
-      averageConfidence,
-      products
+      platform: '',
+      language: '',
+      currency: '',
+      title: '',
+      url: '',
+      sections: [],
+      products: [],
+      contextMetadata: {}
     };
   }
 
-  /**
-   * Reads the readable text of a specific section.
-   */
-  public readSection(sectionId: string): string | null {
-    const section = this.sectionMap.get(sectionId);
-    if (!section) return null;
+  // --- Data Accessors (Frontend Tools) ---
 
-    // Return innerText which naturally excludes hidden elements and preserves some spacing
-    return section.element.innerText;
+  public getRegistry(): Registry {
+    return this.registry;
   }
 
-  /**
-   * Mock implementation for scoring relevance.
-   * Simple keyword matching for demo purposes.
-   */
-  public scoreRelevance(query: string, sectionIds?: string[]): Array<{ sectionId: string; score: number }> {
-    const results: Array<{ sectionId: string; score: number }> = [];
-    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  public getPageSummary(): string {
+    const ctx = this.registry.pageContext;
+    return JSON.stringify({
+      platform: ctx.platform,
+      language: ctx.language,
+      title: ctx.title,
+      sections: ctx.sections.map(s => ({ id: s.id, title: s.title, summary: s.summary })),
+      products: ctx.products.map(p => ({ id: p.id, title: p.title, price: p.price, confidence: p.confidence }))
+    });
+  }
+
+  public listVisibleSections() {
+    return this.registry.sections.map(s => ({
+      sectionId: s.id,
+      title: s.title,
+      summary: s.summary
+    }));
+  }
+
+  public listVisibleProducts() {
+    return {
+      productsFound: this.registry.products.length,
+      products: this.registry.products.map(p => ({
+        title: p.title,
+        price: p.price,
+        url: p.url,
+        sectionId: p.id,
+        confidence: p.confidence
+      }))
+    };
+  }
+
+  public readSection(sectionId: string): string | null {
+    const section = this.registry.sections.find(s => s.id === sectionId);
+    if (section) return section.text;
     
-    const idsToScore = sectionIds || Array.from(this.sectionMap.keys());
+    const product = this.registry.products.find(p => p.id === sectionId);
+    if (product) return product.text; // purely in-memory
+    
+    return null;
+  }
 
-    for (const id of idsToScore) {
-      const section = this.sectionMap.get(id);
-      if (!section) continue;
+  private normalizeText(text: string): string {
+    return text
+      .toLocaleLowerCase('tr-TR')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
 
-      const text = section.element.innerText.toLowerCase();
+  private escapeRegExp(string: string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  public scoreRelevance(query: string, sectionIds?: string[]) {
+    const results: Array<{ sectionId: string; score: number }> = [];
+    const normalizedQuery = this.normalizeText(query);
+    const queryWords = normalizedQuery.split(' ').filter(w => w.length > 0);
+    
+    const itemsToScore = [
+      ...this.registry.sections.map(s => ({ id: s.id, text: s.text })),
+      ...this.registry.products.map(p => ({ id: p.id, text: p.text }))
+    ].filter(item => !sectionIds || sectionIds.includes(item.id));
+
+    for (const item of itemsToScore) {
+      if (!item.text) continue;
+      const normalizedText = this.normalizeText(item.text);
       let score = 0;
 
+      if (normalizedText.includes(normalizedQuery)) score += 100;
+
       queryWords.forEach(word => {
-        if (text.includes(word)) score += 10;
+        if (normalizedText.includes(word)) {
+          try {
+            const regex = new RegExp(`\\b${this.escapeRegExp(word)}\\b`, 'i');
+            if (regex.test(normalizedText)) score += 20;
+            else score += 10;
+          } catch (e) {
+            score += 10;
+          }
+        }
       });
 
-      results.push({ sectionId: id, score });
+      if (score > 0) results.push({ sectionId: item.id, score });
     }
 
-    // Sort by descending score
-    return results.sort((a, b) => b.score - a.score);
+    return results.sort((a, b) => b.score - a.score).slice(0, 10);
   }
 
-  /**
-   * Utility to get an HTML Element by its assigned sectionId
-   */
-  public getElementBySectionId(sectionId: string): HTMLElement | null {
-    return this.sectionMap.get(sectionId)?.element || null;
+  public resolveElement(domRef: DOMReference): HTMLElement | null {
+    if (domRef.datasetId) {
+      const el = document.querySelector(`[${DOMAnalyzer.NANO_ID_ATTR}="${domRef.datasetId}"]`);
+      if (el) return el as HTMLElement;
+    }
+    try {
+      const el = document.querySelector(domRef.selector);
+      if (el) return el as HTMLElement;
+    } catch(e) {}
+    return null;
+  }
+
+  public getDOMReferenceBySectionId(sectionId: string): DOMReference | null {
+    const node = this.registry.sections.find(s => s.id === sectionId) || this.registry.products.find(p => p.id === sectionId);
+    if (!node) return null;
+    return node.domRef;
   }
 }

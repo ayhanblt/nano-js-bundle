@@ -4,12 +4,14 @@ import type { Message } from '../components/MessageBubble';
 import { GeminiProvider } from '../api/GeminiProvider';
 import { AIService } from '../api/AIService';
 import { ToolOrchestrator } from '../engine/ToolOrchestrator';
-
 import { SuggestionEngine } from '../engine/SuggestionEngine';
+import { parseMarkdown } from '../utils/markdown';
+import { t } from '../i18n';
 
 interface ChatContextProps {
   messages: Message[];
   isThinking: boolean;
+  isReady: boolean;
   error: string | null;
   suggestions: string[];
   sendMessage: (text: string) => Promise<void>;
@@ -23,6 +25,7 @@ const ChatContext = createContext<ChatContextProps | undefined>(undefined);
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isThinking, setIsThinking] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   
@@ -45,7 +48,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [messages, suggestionEngine]);
 
   useEffect(() => {
-    aiService.initialize();
+    aiService.initialize().then(() => {
+      setIsReady(true);
+    });
   }, [aiService]);
 
   const addMessage = (msg: Message) => {
@@ -55,6 +60,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const clearMessages = () => setMessages([]);
 
   const sendMessage = async (text: string) => {
+    if (!isReady) return; // Prevent sending before DOM is ready
+    
     const userMsg: Message = {
       id: Date.now().toString(),
       sender: 'user',
@@ -67,35 +74,35 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await aiService.processUserMessage(text);
       
+      const parsedHtml = response.text ? parseMarkdown(response.text) : undefined;
+      
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
         text: response.text,
+        html: parsedHtml,
         actions: response.action ? [response.action] : undefined
       };
       
       if (response.error) {
-        // We can either set the error state, or just let the friendly message flow into the chat
-        // To be safe, we add the message to the chat so the user can see what happened
         addMessage({
           ...aiMsg,
-          error: true // optional extension if we want to style it differently
+          error: true
         });
-        setError('Hata oluştu'); // Triggering the error state UI if desired by design
+        setError(t('msg.error.occurred'));
       } else {
         addMessage(aiMsg);
       }
       
     } catch (err) {
-      // In case something completely broke outside of AIService
-      setError('Bağlantı kurulamadı.');
+      setError(t('msg.connection.error'));
     } finally {
       setIsThinking(false);
     }
   };
 
   return (
-    <ChatContext.Provider value={{ messages, isThinking, error, suggestions, sendMessage, addMessage, clearMessages, setError }}>
+    <ChatContext.Provider value={{ messages, isThinking, isReady, error, suggestions, sendMessage, addMessage, clearMessages, setError }}>
       {children}
     </ChatContext.Provider>
   );

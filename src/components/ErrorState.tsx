@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Icon from './Icon';
+import { t } from '../i18n';
 
 interface ErrorStateProps {
   onRetry: () => void;
@@ -12,58 +13,62 @@ const ErrorState: React.FC<ErrorStateProps> = ({ onRetry, onClose, errorCode = '
 
   const handleRetry = () => {
     setIsRetrying(true);
-    // Simulate retry delay
+    // Simulate network delay for UX
     setTimeout(() => {
       onRetry();
       setIsRetrying(false);
-    }, 1500);
+    }, 800);
   };
 
   return (
-    <div className="flex flex-col h-full bg-surface-container-lowest">
-      {/* Top Bar */}
+    <div className="absolute inset-0 z-50 bg-surface flex flex-col pointer-events-auto overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+      {/* Header */}
       <div className="bg-surface-container-low px-lg py-md flex justify-between items-center border-b border-outline-variant shrink-0">
         <div className="flex items-center gap-sm">
           <div className="w-8 h-8 rounded-full bg-primary-fixed-dim flex items-center justify-center">
-            <Icon name="smart_toy" className="text-primary w-[18px] h-[18px] fill-current" />
+            <Icon name="main_logo" className="text-primary w-[18px] h-[18px] fill-current" />
           </div>
-          <span className="font-label-md text-label-md text-on-surface font-semibold">AI Assistant</span>
+          <span className="font-label-md text-label-md text-on-surface font-semibold">{t('ai.assistant')}</span>
         </div>
-        <button 
+        <button
           onClick={onClose}
           className="text-on-surface-variant hover:bg-surface-container-high p-xs rounded-full transition-colors cursor-pointer active:scale-95"
         >
-          <Icon name="close" className="w-5 h-5 fill-current" />
+          <Icon name="close" className="w-6 h-6 fill-current" />
         </button>
       </div>
-      
+
       {/* Content */}
       <div className="flex-1 p-lg flex flex-col items-center justify-center text-center">
         <div className="mb-md relative">
-          <div className={`w-16 h-16 rounded-full bg-error-container flex items-center justify-center ${!isRetrying ? 'animate-pulse' : ''}`}>
-            <Icon name="cloud_off" className="text-error w-8 h-8 fill-current" />
-          </div>
+          <div className="absolute inset-0 bg-error opacity-10 rounded-full scale-150 animate-pulse"></div>
+          <Icon name="cloud_off" className="w-16 h-16 text-error fill-current relative z-10" />
         </div>
-        <h2 className="font-headline-md text-headline-md mb-sm text-on-surface">Something went wrong</h2>
-        <p className="font-body-md text-body-md text-on-surface-variant mb-lg">
-          I'm having trouble connecting right now. Please check your internet or try again in a moment.
+        
+        <h3 className="font-title-lg text-title-lg text-on-surface mb-sm mt-md">
+          {t('err.unavailable')}
+        </h3>
+        
+        <p className="text-body-md text-on-surface-variant px-sm leading-relaxed mb-xl max-w-[280px]">
+          {t('err.network')}
         </p>
 
         {/* Actions */}
         <div className="w-full flex flex-col gap-sm">
-          <button 
+          <button
             onClick={handleRetry}
             disabled={isRetrying}
-            className="w-full bg-primary-container text-on-primary py-md px-lg rounded-lg font-label-md text-label-md font-semibold hover:bg-[#6d28d9] transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-sm disabled:opacity-80"
+            className="w-full bg-primary-container text-on-primary py-md px-lg rounded-lg font-label-md text-label-md font-semibold hover:bg-[#316bf3] transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-sm disabled:opacity-80"
           >
             <Icon name="refresh" className={`w-[18px] h-[18px] fill-current ${isRetrying ? 'animate-spin' : ''}`} />
-            <span>{isRetrying ? 'Attempting...' : 'Retry connection'}</span>
+            <span>{isRetrying ? t('btn.attempting') : t('btn.retry')}</span>
           </button>
-          <button 
+          
+          <button
             onClick={onClose}
             className="w-full border border-outline-variant bg-transparent text-on-surface-variant py-md px-lg rounded-lg font-label-md text-label-md hover:bg-surface-container-high transition-all cursor-pointer active:scale-95"
           >
-            Close for now
+            {t('btn.close')}
           </button>
         </div>
       </div>

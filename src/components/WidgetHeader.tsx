@@ -1,5 +1,6 @@
 import React from 'react';
 import Icon from './Icon';
+import { t } from '../i18n';
 
 interface WidgetHeaderProps {
   onClose: () => void;
@@ -11,16 +12,11 @@ const WidgetHeader: React.FC<WidgetHeaderProps> = ({ onClose, onExpand }) => {
     <div className="bg-surface-container-low px-md py-sm border-b border-outline-variant flex items-center justify-between">
       <div className="flex items-center gap-sm">
         <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-white">
-          <Icon name="smart_toy" className="w-6 h-6 fill-white" />
+          <Icon name="main_logo" className="w-6 h-6 fill-white" />
         </div>
         <div>
           <div className="flex items-center gap-xs">
-            <span className="font-bold text-on-surface text-label-md">AI Assistant</span>
-            <span className="px-xs py-0.5 bg-primary-fixed text-[10px] font-bold text-on-primary-fixed rounded">BETA</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-            <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-tighter">Online</span>
+            <span className="font-label-lg text-label-lg font-semibold text-on-surface">{t('ai.assistant')}</span>
           </div>
         </div>
       </div>

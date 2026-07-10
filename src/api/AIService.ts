@@ -3,6 +3,7 @@ import { getFullSystemPrompt } from './prompts';
 import { ToolOrchestrator } from '../engine/ToolOrchestrator';
 import { logger } from '../utils/logger';
 import type { MessageAction } from '../components/MessageBubble';
+import { t, getCurrentLanguage } from '../i18n';
 
 export class AIService {
   private provider: AIProvider;
@@ -16,6 +17,7 @@ export class AIService {
   async initialize() {
     try {
       await this.provider.initialize();
+      await this.orchestrator.waitUntilReady();
       logger.log('AIService initialized');
     } catch (err) {
       logger.error('Failed to initialize AIService', err);
@@ -29,8 +31,15 @@ export class AIService {
     try {
       logger.log('AIService processing message:', message);
       
+      const registry = this.orchestrator.analyzer.getRegistry();
+      if (!registry || !registry.isValid) {
+        logger.warn('AIService preflight failed: Registry is not valid or empty.');
+        return this.getFriendlyError(t('msg.analyzing.page'));
+      }
+
       const pageContext = this.orchestrator.getPageContext();
-      const systemPrompt = getFullSystemPrompt();
+      const lang = getCurrentLanguage();
+      const systemPrompt = getFullSystemPrompt(lang);
 
       // Implement timeout logic for the provider call
       let response = await this.withTimeout(
@@ -54,7 +63,7 @@ export class AIService {
           // Special handling for UI actions triggered by tools
           if (call.name === 'highlightElements' && res.status === 'success') {
             finalAction = {
-              label: 'İlgili alana git',
+              label: t('lbl.go.to.area'),
               icon: 'location_on',
               onClick: () => this.orchestrator.executeTool(call) // re-trigger highlight
             };
@@ -90,7 +99,7 @@ export class AIService {
 
       if (loopCount >= MAX_TOOLS) {
         logger.warn('Max tool calls reached');
-        return this.getFriendlyError('Sistem güvenliği için çok fazla işlem yapmamı engelleyen limite ulaştım. Lütfen daha basit bir soru sorar mısın?');
+        return this.getFriendlyError(t('msg.limit.reached'));
       }
 
       if (response.error) {
@@ -100,7 +109,7 @@ export class AIService {
 
       if (!response.message) {
         logger.warn('Provider returned an empty message');
-        return this.getFriendlyError('Aldığım cevap boştu, lütfen tekrar sorar mısın?');
+        return this.getFriendlyError(t('msg.empty.response'));
       }
 
       return {
@@ -116,7 +125,7 @@ export class AIService {
 
   private getFriendlyError(customMessage?: string) {
     return { 
-      text: customMessage || 'Şu an bağlantı kuramıyorum veya bir hata oluştu. Lütfen tekrar deneyin.', 
+      text: customMessage || t('msg.default.error'), 
       error: true 
     };
   }

@@ -1,38 +1,36 @@
+import type { DOMReference } from './types';
+import type { DOMAnalyzer } from './DOMAnalyzer';
+
 export class DOMHighlighter {
   private static readonly STYLE_ID = 'nano-highlight-styles';
   private static readonly HIGHLIGHT_CLASS = 'nano-highlight-active';
-  
-  // Track highlighted elements to avoid duplicate work and allow easy cleanup
-  private activeHighlights: Set<Element> = new Set();
 
-  constructor() {
+  private activeOverlays: Set<HTMLElement> = new Set();
+  private activeTrackers: number[] = [];
+  private analyzer: DOMAnalyzer;
+
+  constructor(analyzer: DOMAnalyzer) {
+    this.analyzer = analyzer;
     this.injectStyles();
   }
 
-  /**
-   * Injects the required CSS styles into the host document's head exactly once.
-   */
   private injectStyles() {
     if (document.getElementById(DOMHighlighter.STYLE_ID)) {
-      return; // Styles already exist
+      return;
     }
 
     const style = document.createElement('style');
     style.id = DOMHighlighter.STYLE_ID;
-    
-    // Using a very specific namespace 'nano-' to prevent collisions
-    // Only adding box-shadow, background-color, and transitions
-    // We use !important here because we explicitly want to override host styles temporarily
-    // while highlighted, but removing the class will restore original state perfectly.
+
     style.textContent = `
       .${DOMHighlighter.HIGHLIGHT_CLASS} {
         animation: nano-pulse-glow-yellow 2s infinite ease-in-out !important;
-        position: relative !important;
+        position: absolute !important;
         z-index: 2147483647 !important;
         border-radius: 4px !important;
-        outline: 2px solid #FFD700 !important;
-        outline-offset: 4px !important;
-        transition: all 0.3s ease-in-out !important;
+        outline: 3px solid #FFD700 !important;
+        pointer-events: none !important;
+        transition: all 0.1s ease-out !important;
       }
 
       @keyframes nano-pulse-glow-yellow {
@@ -51,53 +49,93 @@ export class DOMHighlighter {
   }
 
   /**
-   * Highlights specific elements by adding a CSS class.
-   * Does not mutate inline styles.
+   * Highlights specific elements dynamically using DOMReference to survive React rerenders.
    */
-  public highlightElements(elements: Element[]): boolean {
-    if (!elements || elements.length === 0) return false;
+  public highlightElements(refs: DOMReference[]): boolean {
+    if (!refs || refs.length === 0) return false;
 
-    let highlightedCount = 0;
+    let started = false;
 
-    for (const el of elements) {
-      if (this.activeHighlights.has(el)) {
-        continue; // Skip if already highlighted
+    for (const ref of refs) {
+      const overlay = document.createElement('div');
+      overlay.className = DOMHighlighter.HIGHLIGHT_CLASS;
+      overlay.style.display = 'none'; // hidden until resolved
+      document.body.appendChild(overlay);
+      this.activeOverlays.add(overlay);
+      started = true;
+
+      const track = () => {
+        const el = this.analyzer.resolveElement(ref);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            overlay.style.display = 'block';
+            overlay.style.top = (rect.top + window.scrollY) + 'px';
+            overlay.style.left = (rect.left + window.scrollX) + 'px';
+            overlay.style.width = rect.width + 'px';
+            overlay.style.height = rect.height + 'px';
+          } else {
+            overlay.style.display = 'none';
+          }
+        } else {
+          overlay.style.display = 'none';
+        }
+
+        const rafId = requestAnimationFrame(track);
+        this.activeTrackers.push(rafId);
+      };
+
+      track();
+    }
+
+    if (started) {
+      setTimeout(() => {
+        this.clearHighlights();
+      }, 4000);
+    }
+
+    return started;
+  }
+
+  /**
+   * Smoothly scrolls to the first resolved element.
+   */
+  public scrollToElement(refs: DOMReference[]): boolean {
+    if (!refs || refs.length === 0) return false;
+
+    const firstRef = refs[0];
+    const el = this.analyzer.resolveElement(firstRef);
+
+    if (el) {
+      try {
+        el.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+        return true;
+      } catch (e) {
+        return false;
       }
-
-      el.classList.add(DOMHighlighter.HIGHLIGHT_CLASS);
-      this.activeHighlights.add(el);
-      highlightedCount++;
     }
-
-    return highlightedCount > 0;
+    return false;
   }
 
   /**
-   * Smoothly scrolls to the first element in the provided list.
-   */
-  public scrollToElement(elements: Element[]): boolean {
-    if (!elements || elements.length === 0) return false;
-
-    const firstElement = elements[0];
-    
-    try {
-      firstElement.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /**
-   * Cleans up all active highlights, restoring the DOM to its original state.
+   * Cleans up all active highlight overlays and stops tracking.
    */
   public clearHighlights() {
-    for (const el of this.activeHighlights) {
-      el.classList.remove(DOMHighlighter.HIGHLIGHT_CLASS);
+    // Stop tracking loops
+    for (const id of this.activeTrackers) {
+      cancelAnimationFrame(id);
     }
-    this.activeHighlights.clear();
+    this.activeTrackers = [];
+
+    // Remove overlays
+    for (const overlay of this.activeOverlays) {
+      if (document.body.contains(overlay)) {
+        document.body.removeChild(overlay);
+      }
+    }
+    this.activeOverlays.clear();
   }
 }
