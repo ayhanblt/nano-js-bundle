@@ -18,7 +18,7 @@ const WidgetShell: React.FC = () => {
   const handleClose = () => setIsOpen(false);
 
   return (
-    <div className="fixed bottom-0 right-0 md:bottom-lg md:right-lg z-50 flex flex-col items-end gap-md pointer-events-none w-full md:max-w-[380px]">
+    <div className="fixed bottom-0 right-0 md:bottom-lg md:right-lg z-[2147483647] flex flex-col items-end gap-md pointer-events-none w-full md:max-w-[380px]">
 
       {/* Widget Window */}
       <div

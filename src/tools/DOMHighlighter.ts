@@ -26,7 +26,7 @@ export class DOMHighlighter {
       .${DOMHighlighter.HIGHLIGHT_CLASS} {
         animation: nano-pulse-glow-yellow 2s infinite ease-in-out !important;
         position: absolute !important;
-        z-index: 2147483647 !important;
+        z-index: 2147483646 !important;
         border-radius: 4px !important;
         outline: 3px solid #FFD700 !important;
         pointer-events: none !important;
