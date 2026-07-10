@@ -17,6 +17,14 @@ export class GeminiBackendProvider {
     context: { systemPrompt: string; pageContext: string },
     history?: { toolCalls: any[]; toolResponses: any[] }
   ) {
+    // Temporary debug code to list available models
+    try {
+      const modelsResponse = await this.ai.models.list();
+      console.log('[DEBUG] Available models:', JSON.stringify(modelsResponse, null, 2));
+    } catch (err) {
+      console.error('[DEBUG] Failed to list models:', err);
+    }
+
     try {
       const toolDeclarations: FunctionDeclaration[] = [
         {
