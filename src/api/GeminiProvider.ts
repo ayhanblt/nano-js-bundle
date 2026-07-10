@@ -1,8 +1,9 @@
-import type { AIProvider, AIResponse } from './types';
+import type { AIProvider, AIResponse, ToolCall, ToolResponse } from './types';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 
 export class GeminiProvider implements AIProvider {
-  private _endpointUrl = '/api/chat'; // Future backend endpoint
+  private _endpointUrl = config.apiEndpoint;
 
   async initialize(): Promise<void> {
     logger.log('GeminiProvider initialized.');
@@ -12,7 +13,7 @@ export class GeminiProvider implements AIProvider {
   async sendMessageWithTools(
     message: string, 
     _context: { systemPrompt: string; pageContext: string },
-    history?: { toolCalls: import('./types').ToolCall[]; toolResponses: import('./types').ToolResponse[] }
+    history?: { toolCalls: ToolCall[]; toolResponses: ToolResponse[] }
   ): Promise<AIResponse> {
     logger.log('GeminiProvider preparing request to backend...', { message, _endpointUrl: this._endpointUrl });
     
