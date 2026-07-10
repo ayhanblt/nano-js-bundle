@@ -32,7 +32,7 @@ function initWidget() {
   host.style.position = 'fixed';
   host.style.bottom = '0';
   host.style.right = '0';
-  host.style.zIndex = '999999';
+  host.style.zIndex = '2147483647';
   host.style.pointerEvents = 'none'; // Let clicks pass through the host container itself
   document.body.appendChild(host);
 
