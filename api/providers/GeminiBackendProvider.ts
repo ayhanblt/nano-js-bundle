@@ -7,13 +7,13 @@ export class GeminiBackendProvider {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is missing.');
     }
-    
+
     // Initialize the new Google GenAI SDK
     this.ai = new GoogleGenAI({ apiKey });
   }
 
   async sendMessage(
-    message: string, 
+    message: string,
     context: { systemPrompt: string; pageContext: string },
     history?: { toolCalls: any[]; toolResponses: any[] }
   ) {
@@ -54,7 +54,7 @@ export class GeminiBackendProvider {
       ];
 
       const contents: any[] = [];
-      
+
       // 1. Initial User Message
       contents.push({
         role: 'user',
@@ -79,7 +79,7 @@ export class GeminiBackendProvider {
       }
 
       const response = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents,
         config: {
           tools: [{ functionDeclarations: toolDeclarations }],
