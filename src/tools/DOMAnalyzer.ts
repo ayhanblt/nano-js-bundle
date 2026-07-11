@@ -16,6 +16,19 @@ export class DOMAnalyzer {
   private isReady = false;
   private static readonly NANO_ID_ATTR = 'data-nano-section-id';
 
+  private static readonly NEGATIVE_KEYWORDS = [
+    // Turkish
+    'indirim', 'kupon', 'kampanya', 'taksit', 'vade', 'hediye', 'hediyeli',
+    'puan', 'worldpuan', 'bonus', 'paracık', 'cashback', 'iade', 'kazan',
+    'fırsat', 'avantaj', 'özel teklif', 'özel fiyat', 'başlayan', 'itibaren',
+    'sepette', 'sepette indirim', 'stok', 'stokta', 'ücretsiz', 'kargo',
+    'garanti', 'kompresör garantisi', 'servis', 'kurulum', 'montaj',
+    // English
+    'discount', 'coupon', 'promo', 'promotion', 'campaign', 'save', 'offer',
+    'deal', 'installment', 'shipping', 'free shipping', 'gift', 'reward',
+    'starting from', 'from', 'warranty', 'service', 'installation'
+  ];
+
   // --- Core Lifecycle ---
 
   public async waitUntilReady(): Promise<boolean> {
@@ -143,6 +156,118 @@ export class DOMAnalyzer {
     return id;
   }
 
+  private extractPriceFromBoundary(boundary: HTMLElement) {
+    const candidates = Array.from(boundary.querySelectorAll('span, div, p, strong, b, s, del, strike'));
+    const validPrices: { el: HTMLElement, val: number, isOld: boolean, currency: string, fontSize: number, fontWeight: number, depth: number }[] = [];
+
+    const parseCurrency = (text: string): { val: number, currency: string } | null => {
+      const match = text.match(/(?:₺|\$|€|£|TL)\s*\d+[.,]?\d*|\d+[.,]?\d*\s*(?:TL|USD|EUR|TRY|₺|\$|€|£)/i);
+      if (!match) return null;
+      let raw = match[0].toUpperCase();
+      let currency = 'TRY';
+      if (raw.includes('$') || raw.includes('USD')) currency = 'USD';
+      else if (raw.includes('€') || raw.includes('EUR')) currency = 'EUR';
+      else if (raw.includes('£')) currency = 'GBP';
+
+      const numStr = raw.replace(/[^\d.,]/g, '');
+      let num = 0;
+      if (numStr.includes(',') && numStr.includes('.')) {
+        if (numStr.lastIndexOf(',') > numStr.lastIndexOf('.')) {
+          num = parseFloat(numStr.replace(/\./g, '').replace(',', '.'));
+        } else {
+          num = parseFloat(numStr.replace(/,/g, ''));
+        }
+      } else if (numStr.includes(',')) {
+        const parts = numStr.split(',');
+        if (parts[1] && parts[1].length === 2) {
+          num = parseFloat(numStr.replace(',', '.'));
+        } else {
+          num = parseFloat(numStr.replace(',', ''));
+        }
+      } else {
+        num = parseFloat(numStr);
+      }
+      return num > 0 ? { val: num, currency } : null;
+    };
+
+    const hasNegativeKeyword = (el: HTMLElement): boolean => {
+      let current: HTMLElement | null = el;
+      while (current && current !== boundary) {
+        const text = (current.innerText || '').toLowerCase();
+        const classes = (current.className || '').toString().toLowerCase();
+        if (classes.includes('promo') || classes.includes('discount') || classes.includes('badge') || classes.includes('campaign')) return true;
+        
+        for (const kw of DOMAnalyzer.NEGATIVE_KEYWORDS) {
+          if (text.includes(kw)) return true;
+        }
+        current = current.parentElement;
+      }
+      return false;
+    };
+
+    const getDepth = (el: HTMLElement) => {
+      let depth = 0;
+      let curr = el;
+      while (curr && curr !== boundary) {
+        depth++;
+        curr = curr.parentElement!;
+      }
+      return depth;
+    };
+
+    candidates.forEach(node => {
+      const el = node as HTMLElement;
+      const text = el.innerText || '';
+      if (!text.trim() || el.children.length > 2) return;
+      
+      const parsed = parseCurrency(text);
+      if (parsed) {
+        if (hasNegativeKeyword(el)) return;
+
+        const isOld = ['S', 'DEL', 'STRIKE'].includes(el.tagName) || 
+                      (el.className && typeof el.className === 'string' && el.className.toLowerCase().match(/(old|original|discounted-from|slash)/));
+                      
+        const style = window.getComputedStyle(el);
+        const fontSize = parseFloat(style.fontSize) || 14;
+        const fontWeight = parseInt(style.fontWeight) || (style.fontWeight === 'bold' ? 700 : 400);
+        
+        validPrices.push({
+          el,
+          val: parsed.val,
+          currency: parsed.currency,
+          isOld: !!isOld,
+          fontSize,
+          fontWeight,
+          depth: getDepth(el)
+        });
+      }
+    });
+
+    if (validPrices.length === 0) {
+      return { currentPrice: null, oldPrice: null, currency: null, priceConfidence: 'NONE' as const };
+    }
+
+    const olds = validPrices.filter(p => p.isOld);
+    const currents = validPrices.filter(p => !p.isOld);
+
+    // Prefer the visually dominant price inside the card
+    currents.sort((a, b) => {
+      if (b.fontSize !== a.fontSize) return b.fontSize - a.fontSize;
+      if (b.fontWeight !== a.fontWeight) return b.fontWeight - a.fontWeight;
+      return a.depth - b.depth;
+    });
+
+    const bestCurrent = currents[0] || null;
+    let bestOld = olds[0] || null;
+
+    return {
+      currentPrice: bestCurrent ? bestCurrent.val : null,
+      oldPrice: bestOld ? bestOld.val : null,
+      currency: (bestCurrent || bestOld)?.currency || null,
+      priceConfidence: bestCurrent ? 'HIGH' as const : 'NONE' as const
+    };
+  }
+
   private performSingleTraversal() {
     const sections: Section[] = [];
     const products: Product[] = [];
@@ -161,25 +286,29 @@ export class DOMAnalyzer {
         if (text.length < 10) return;
 
         // Is it a Product Boundary?
-        const priceMatch = text.match(/(?:₺|\$|€|£|TL)\s*\d+[.,]?\d*|\d+[.,]?\d*\s*(?:TL|USD|EUR|TRY)/i);
+        const hasPriceMatch = text.match(/(?:₺|\$|€|£|TL)\s*\d+[.,]?\d*|\d+[.,]?\d*\s*(?:TL|USD|EUR|TRY)/i);
         const images = current.querySelectorAll('img');
         const links = current.querySelectorAll('a');
         
-        if (priceMatch && images.length > 0 && links.length > 0 && current.getBoundingClientRect().width > 50) {
+        if (hasPriceMatch && images.length > 0 && links.length > 0 && current.getBoundingClientRect().width > 50) {
            const id = this.assignDatasetId(current, 'prod');
            const headings = current.querySelectorAll('h1, h2, h3, h4, h5, h6, strong, b');
            let title = headings.length > 0 ? (headings[0] as HTMLElement).innerText : text.split('\n')[0];
            title = title.substring(0, 50).trim();
            
            if (title.length > 3) {
+             const pricing = this.extractPriceFromBoundary(current);
+             
              products.push({
                id,
                type: 'PRODUCT',
                domRef: { selector: this.getSelector(current), datasetId: id },
                title,
                text: text.trim(),
-               price: priceMatch[0].trim(),
-               currency: null,
+               currentPrice: pricing.currentPrice,
+               oldPrice: pricing.oldPrice,
+               currency: pricing.currency,
+               priceConfidence: pricing.priceConfidence,
                url: (links[0] as HTMLAnchorElement).href,
                image: (images[0] as HTMLImageElement).src || null,
                confidence: 'HIGH'
@@ -243,7 +372,14 @@ export class DOMAnalyzer {
       language: ctx.language,
       title: ctx.title,
       sections: ctx.sections.map(s => ({ id: s.id, title: s.title, summary: s.summary })),
-      products: ctx.products.map(p => ({ id: p.id, title: p.title, price: p.price, confidence: p.confidence }))
+      products: ctx.products.map(p => ({ 
+        id: p.id, 
+        title: p.title, 
+        currentPrice: p.currentPrice, 
+        oldPrice: p.oldPrice,
+        currency: p.currency,
+        confidence: p.confidence 
+      }))
     });
   }
 
@@ -260,7 +396,9 @@ export class DOMAnalyzer {
       productsFound: this.registry.products.length,
       products: this.registry.products.map(p => ({
         title: p.title,
-        price: p.price,
+        currentPrice: p.currentPrice,
+        oldPrice: p.oldPrice,
+        currency: p.currency,
         url: p.url,
         sectionId: p.id,
         confidence: p.confidence

@@ -9,7 +9,7 @@ Amacın sayfada görünen ürün bilgilerini temel alarak kullanıcının sorula
 
 export const TOOL_INSTRUCTIONS = {
   en: `You have access to the following tools:
-1. listVisibleProducts: Detects and lists all product cards on the screen including their titles, prices, and IDs. PRIORITIZE this tool for any product comparison or pricing questions.
+1. listVisibleProducts: Detects and lists all product cards on the screen including their titles, currentPrice, oldPrice, and IDs. PRIORITIZE this tool for any product comparison or pricing questions.
 2. listVisibleSections: Gets a list of available sections on the page. Use this as a fallback if listVisibleProducts returns an empty list or for non-product queries.
 3. readSection(sectionId): Gets the text content of a specific section.
 4. scoreRelevance(query, sections): Helps find the most relevant sections for a query.
@@ -17,7 +17,7 @@ export const TOOL_INSTRUCTIONS = {
 
 When using tools, you MUST prioritize using highlightElements if you are citing a specific fact from the page.`,
   tr: `Aşağıdaki araçlara erişimin var:
-1. listVisibleProducts: Ekrandaki ürün kartlarını (başlık, fiyat, ID) tespit eder ve listeler. Ürün karşılaştırma ve fiyat sorularında ÖNCELİKLE bu aracı kullan.
+1. listVisibleProducts: Ekrandaki ürün kartlarını (başlık, currentPrice, oldPrice, ID) tespit eder ve listeler. Ürün karşılaştırma ve fiyat sorularında ÖNCELİKLE bu aracı kullan.
 2. listVisibleSections: Sayfadaki mevcut bölümleri listeler. Ürün bulunamazsa veya ürün dışı sorularda yedek olarak kullan.
 3. readSection(sectionId): Belirli bir bölümün metin içeriğini getirir.
 4. scoreRelevance(query, sections): Soruya en uygun bölümleri bulmaya yardımcı olur.

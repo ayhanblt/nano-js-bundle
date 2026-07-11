@@ -16,8 +16,10 @@ export interface Product extends BaseNode {
   type: 'PRODUCT';
   title: string;
   text: string;
-  price: string | null;
+  currentPrice: number | null;
+  oldPrice: number | null;
   currency: string | null;
+  priceConfidence: ConfidenceLevel | 'NONE';
   url: string | null;
   image: string | null;
   confidence: ConfidenceLevel;

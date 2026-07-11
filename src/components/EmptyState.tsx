@@ -27,7 +27,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onSuggestionClick, suggestions 
   return (
     <div className="flex-1 p-lg flex flex-col items-center justify-center text-center bg-[#f7f9ffff] overflow-y-auto">
       <div
-        className="mb-lg opacity-20"
+        className="mb-lg mt-24 opacity-20"
         style={{ transform: `translateY(${offsetY}px) scale(1.5)` }}
       >
         <Icon name="smart_toy" className="w-24 h-24 text-primary fill-current" />

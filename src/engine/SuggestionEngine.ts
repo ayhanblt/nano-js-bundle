@@ -19,7 +19,7 @@ export class SuggestionEngine {
     const lastUserMessage = [...messages].reverse().find(m => m.sender === 'user')?.text?.toLowerCase() || '';
 
     if (products.length > 0) {
-      const hasPrices = products.some(p => p.price);
+      const hasPrices = products.some(p => p.currentPrice !== null);
       const hasMultiple = products.length > 1;
       const hasEnergyClass = products.some(p => p.title.match(/\b(A\+\+\+|A\+\+|A\+|A|B|C|D|E|F|G)\b|\bkWh\b/i));
       
